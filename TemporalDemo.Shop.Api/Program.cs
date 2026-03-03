@@ -1,3 +1,4 @@
+using TemporalDemo.ServiceDefaults;
 using Temporalio.Client;
 using TemporalDemo.Shop.Api.Infrastructure;
 using TemporalDemo.Shop.Api.Temporal;

@@ -3,15 +3,8 @@ using Temporalio.Activities;
 
 namespace TemporalDemo.Shop.Api.Temporal;
 
-public sealed class ShopActivities : IShopActivities
+public sealed class ShopActivities(ShopStore store) : IShopActivities
 {
-    private readonly ShopStore store;
-
-    public ShopActivities(ShopStore store)
-    {
-        this.store = store;
-    }
-
     [Activity]
     public Task ReserveInventoryAsync(OrderWorkflowInput input)
     {

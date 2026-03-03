@@ -3,22 +3,12 @@ using Temporalio.Worker;
 
 namespace TemporalDemo.Payments.Api.Temporal;
 
-public sealed class PaymentsWorkerService : BackgroundService
+public sealed class PaymentsWorkerService(
+    TemporalClient temporalClient,
+    PaymentsActivities activities,
+    ILogger<PaymentsWorkerService> logger)
+    : BackgroundService
 {
-    private readonly TemporalClient temporalClient;
-    private readonly PaymentsActivities activities;
-    private readonly ILogger<PaymentsWorkerService> logger;
-
-    public PaymentsWorkerService(
-        TemporalClient temporalClient,
-        PaymentsActivities activities,
-        ILogger<PaymentsWorkerService> logger)
-    {
-        this.temporalClient = temporalClient;
-        this.activities = activities;
-        this.logger = logger;
-    }
-
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         using var worker = new TemporalWorker(

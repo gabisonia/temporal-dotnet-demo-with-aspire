@@ -3,15 +3,8 @@ using Temporalio.Activities;
 
 namespace TemporalDemo.Payments.Api.Temporal;
 
-public sealed class PaymentsActivities
+public sealed class PaymentsActivities(PaymentsStore store)
 {
-    private readonly PaymentsStore store;
-
-    public PaymentsActivities(PaymentsStore store)
-    {
-        this.store = store;
-    }
-
     [Activity(PaymentActivityNames.ChargePayment)]
     public Task ChargePaymentAsync(string orderId, decimal amount)
     {

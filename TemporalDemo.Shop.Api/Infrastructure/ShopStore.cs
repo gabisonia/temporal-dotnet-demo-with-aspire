@@ -5,24 +5,24 @@ namespace TemporalDemo.Shop.Api.Infrastructure;
 
 public sealed class ShopStore
 {
-    private readonly ConcurrentDictionary<Guid, ProductInventory> products = new()
+    private readonly ConcurrentDictionary<Guid, ProductInventory> _products = new()
     {
         [Guid.Parse("11111111-1111-1111-1111-111111111111")] = new("Laptop", 1200m, 5),
         [Guid.Parse("22222222-2222-2222-2222-222222222222")] = new("Headphones", 250m, 12),
         [Guid.Parse("33333333-3333-3333-3333-333333333333")] = new("Mouse", 80m, 25),
     };
 
-    private readonly ConcurrentDictionary<string, ShopOrder> orders = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, ShopOrder> _orders = new(StringComparer.OrdinalIgnoreCase);
 
     public IReadOnlyCollection<ShopProduct> GetProducts() =>
-        products
+        _products
             .Select(x => new ShopProduct(x.Key, x.Value.Name, x.Value.Price))
             .OrderBy(x => x.Name)
             .ToArray();
 
     public bool TryGetProduct(Guid id, out ShopProduct? product)
     {
-        if (!products.TryGetValue(id, out var inventory))
+        if (!_products.TryGetValue(id, out var inventory))
         {
             product = null;
             return false;
@@ -34,19 +34,19 @@ public sealed class ShopStore
 
     public ShopOrder? GetOrder(string orderId)
     {
-        orders.TryGetValue(orderId, out var order);
+        _orders.TryGetValue(orderId, out var order);
         return order;
     }
 
     public void CreatePendingOrder(OrderWorkflowInput input)
     {
         var order = new ShopOrder(input.OrderId, input.ProductId, input.Quantity, input.Amount, "pending", null);
-        orders[input.OrderId] = order;
+        _orders[input.OrderId] = order;
     }
 
     public void ReserveInventory(OrderWorkflowInput input)
     {
-        if (!products.TryGetValue(input.ProductId, out var inStock))
+        if (!_products.TryGetValue(input.ProductId, out var inStock))
         {
             throw new InvalidOperationException($"Product '{input.ProductId}' does not exist.");
         }
@@ -56,32 +56,33 @@ public sealed class ShopStore
             throw new InvalidOperationException($"Not enough inventory for '{input.ProductId}'.");
         }
 
-        products[input.ProductId] = inStock with { Stock = inStock.Stock - input.Quantity };
+        _products[input.ProductId] = inStock with { Stock = inStock.Stock - input.Quantity };
 
-        orders.AddOrUpdate(
+        _orders.AddOrUpdate(
             input.OrderId,
-            _ => new ShopOrder(input.OrderId, input.ProductId, input.Quantity, input.Amount, "inventory_reserved", null),
+            _ => new ShopOrder(input.OrderId, input.ProductId, input.Quantity, input.Amount, "inventory_reserved",
+                null),
             (_, existing) => existing with { Status = "inventory_reserved", FailureReason = null });
     }
 
     public void MarkCompleted(string orderId)
     {
-        if (!orders.TryGetValue(orderId, out var existing))
+        if (!_orders.TryGetValue(orderId, out var existing))
         {
             return;
         }
 
-        orders[orderId] = existing with { Status = "completed", FailureReason = null };
+        _orders[orderId] = existing with { Status = "completed", FailureReason = null };
     }
 
     public void MarkFailed(string orderId, string reason)
     {
-        if (!orders.TryGetValue(orderId, out var existing))
+        if (!_orders.TryGetValue(orderId, out var existing))
         {
             return;
         }
 
-        orders[orderId] = existing with { Status = "failed", FailureReason = reason };
+        _orders[orderId] = existing with { Status = "failed", FailureReason = reason };
     }
 }
 

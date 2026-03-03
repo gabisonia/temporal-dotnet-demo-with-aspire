@@ -1,6 +1,7 @@
 using Temporalio.Client;
 using TemporalDemo.Payments.Api.Infrastructure;
 using TemporalDemo.Payments.Api.Temporal;
+using TemporalDemo.ServiceDefaults;
 
 var builder = WebApplication.CreateBuilder(args);
 

@@ -14,8 +14,12 @@ var temporal = builder
     .WithEnvironment("POSTGRES_PWD", "temporal")
     .WithEnvironment("POSTGRES_SEEDS", "temporal-postgres")
     .WaitFor(temporalPostgres)
-    .WithEndpoint(name: "grpc", port: 7233, targetPort: 7233)
-    .WithEndpoint(name: "ui", port: 8233, targetPort: 8233);
+    .WithEndpoint(name: "grpc", port: 7233, targetPort: 7233);
+
+builder.AddContainer("temporal-ui", "temporalio/ui")
+    .WithEnvironment("TEMPORAL_ADDRESS", "temporal:7233")
+    .WaitFor(temporal)
+    .WithHttpEndpoint(name: "http", port: 8233, targetPort: 8080);
 
 builder.AddProject("shop-api", "../TemporalDemo.Shop.Api/TemporalDemo.Shop.Api.csproj")
     .WaitFor(temporal)

@@ -14,7 +14,9 @@ public sealed class PaymentsWorkerService(
         using var worker = new TemporalWorker(
             temporalClient,
             new TemporalWorkerOptions(TemporalTaskQueues.Payments)
-                .AddActivity(activities.ChargePaymentAsync));
+                .AddWorkflow<PaymentsHelloWorldWorkflow>()
+                .AddActivity(activities.ChargePaymentAsync)
+                .AddActivity(activities.PrintHelloWorldAsync));
 
         logger.LogInformation("Payments Temporal worker started on task queue {TaskQueue}",
             TemporalTaskQueues.Payments);

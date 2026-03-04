@@ -23,6 +23,7 @@ builder.Services.AddSingleton<TemporalClient>(_ =>
     }).GetAwaiter().GetResult();
 });
 builder.Services.AddHostedService<PaymentsWorkerService>();
+builder.Services.AddHostedService<PaymentsCronStarterService>();
 
 var app = builder.Build();
 

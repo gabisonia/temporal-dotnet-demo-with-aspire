@@ -8,11 +8,8 @@ public sealed class PaymentsActivities(
     ILogger<PaymentsActivities> logger)
 {
     [Activity(PaymentActivityNames.ChargePayment)]
-    public Task ChargePaymentAsync(string orderId, decimal amount)
-    {
-        store.Charge(orderId, amount);
-        return Task.CompletedTask;
-    }
+    public Task ChargePaymentAsync(string orderId, decimal amount) =>
+        store.ChargeAsync(orderId, amount);
 
     [Activity(PaymentActivityNames.PrintHelloWorld)]
     public Task PrintHelloWorldAsync()

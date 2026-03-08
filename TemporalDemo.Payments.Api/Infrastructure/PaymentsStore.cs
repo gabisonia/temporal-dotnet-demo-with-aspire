@@ -1,32 +1,65 @@
-using System.Collections.Concurrent;
+using Microsoft.EntityFrameworkCore;
 
 namespace TemporalDemo.Payments.Api.Infrastructure;
 
-public sealed class PaymentsStore
+public sealed class PaymentsStore(IDbContextFactory<PaymentsDbContext> dbContextFactory)
 {
-    private readonly ConcurrentDictionary<string, PaymentRecord> payments = new(StringComparer.OrdinalIgnoreCase);
-
-    public IReadOnlyCollection<PaymentRecord> GetAll() => payments.Values.OrderBy(x => x.UpdatedAtUtc).ToArray();
-
-    public PaymentRecord? Get(string orderId)
+    public async Task<IReadOnlyCollection<PaymentRecord>> GetAllAsync(CancellationToken cancellationToken = default)
     {
-        payments.TryGetValue(orderId, out var record);
-        return record;
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+        return await dbContext.Payments
+            .AsNoTracking()
+            .OrderBy(x => x.UpdatedAtUtc)
+            .Select(x => new PaymentRecord(x.OrderId, x.Amount, x.Status, x.UpdatedAtUtc))
+            .ToArrayAsync(cancellationToken);
     }
 
-    public PaymentRecord Charge(string orderId, decimal amount)
+    public async Task<PaymentRecord?> GetAsync(string orderId, CancellationToken cancellationToken = default)
     {
-        // Deterministic demo decline rule.
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+        return await dbContext.Payments
+            .AsNoTracking()
+            .Where(x => x.OrderId == orderId)
+            .Select(x => new PaymentRecord(x.OrderId, x.Amount, x.Status, x.UpdatedAtUtc))
+            .SingleOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task<PaymentRecord> ChargeAsync(
+        string orderId,
+        decimal amount,
+        CancellationToken cancellationToken = default)
+    {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+        var payment = await dbContext.Payments.SingleOrDefaultAsync(x => x.OrderId == orderId, cancellationToken);
+        payment ??= new PaymentEntity { OrderId = orderId };
+
+        payment.Amount = amount;
+        payment.UpdatedAtUtc = DateTimeOffset.UtcNow;
+
         if (amount > 5_000m)
         {
-            var failed = new PaymentRecord(orderId, amount, "declined", DateTimeOffset.UtcNow);
-            payments[orderId] = failed;
-            throw new InvalidOperationException($"Payment declined for order '{orderId}' because amount exceeds limit.");
+            payment.Status = "declined";
+            if (dbContext.Entry(payment).State == EntityState.Detached)
+            {
+                dbContext.Payments.Add(payment);
+            }
+
+            await dbContext.SaveChangesAsync(cancellationToken);
+            throw new InvalidOperationException(
+                $"Payment declined for order '{orderId}' because amount exceeds limit.");
         }
 
-        var approved = new PaymentRecord(orderId, amount, "approved", DateTimeOffset.UtcNow);
-        payments[orderId] = approved;
-        return approved;
+        payment.Status = "approved";
+        if (dbContext.Entry(payment).State == EntityState.Detached)
+        {
+            dbContext.Payments.Add(payment);
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return new PaymentRecord(payment.OrderId, payment.Amount, payment.Status, payment.UpdatedAtUtc);
     }
 }
 

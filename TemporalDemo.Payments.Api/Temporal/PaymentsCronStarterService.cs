@@ -8,32 +8,59 @@ public sealed class PaymentsCronStarterService(
     ILogger<PaymentsCronStarterService> logger) : IHostedService
 {
     private const string HelloWorldCronExpression = "*/1 * * * *";
+    private static readonly TimeSpan RetryDelay = TimeSpan.FromSeconds(1);
+    private static readonly TimeSpan StartupTimeout = TimeSpan.FromSeconds(30);
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        try
-        {
-            await temporalClient.StartWorkflowAsync(
-                (IPaymentsHelloWorldWorkflow wf) => wf.RunAsync(),
-                new WorkflowOptions(
-                    id: PaymentsWorkflowIds.HelloWorldCron,
-                    taskQueue: TemporalTaskQueues.Payments)
-                {
-                    CronSchedule = HelloWorldCronExpression,
-                });
+        var startedAt = DateTimeOffset.UtcNow;
 
-            logger.LogInformation(
-                "Started payments demo cron workflow {WorkflowId} with cron {CronExpression}",
-                PaymentsWorkflowIds.HelloWorldCron,
-                HelloWorldCronExpression);
-        }
-        catch (WorkflowAlreadyStartedException)
+        while (true)
         {
-            logger.LogInformation(
-                "Payments demo cron workflow {WorkflowId} is already running",
-                PaymentsWorkflowIds.HelloWorldCron);
+            cancellationToken.ThrowIfCancellationRequested();
+
+            try
+            {
+                await temporalClient.StartWorkflowAsync(
+                    (IPaymentsHelloWorldWorkflow wf) => wf.RunAsync(),
+                    new WorkflowOptions(
+                        id: PaymentsWorkflowIds.HelloWorldCron,
+                        taskQueue: TemporalTaskQueues.Payments)
+                    {
+                        CronSchedule = HelloWorldCronExpression,
+                    });
+
+                logger.LogInformation(
+                    "Started payments demo cron workflow {WorkflowId} with cron {CronExpression}",
+                    PaymentsWorkflowIds.HelloWorldCron,
+                    HelloWorldCronExpression);
+                return;
+            }
+            catch (WorkflowAlreadyStartedException)
+            {
+                logger.LogInformation(
+                    "Payments demo cron workflow {WorkflowId} is already running",
+                    PaymentsWorkflowIds.HelloWorldCron);
+                return;
+            }
+            catch (RpcException ex) when (IsNamespaceNotReady(ex))
+            {
+                if (DateTimeOffset.UtcNow - startedAt >= StartupTimeout)
+                {
+                    throw;
+                }
+
+                logger.LogInformation(
+                    "Temporal namespace is not ready for payments cron starter yet, retrying");
+
+                await Task.Delay(RetryDelay, cancellationToken);
+            }
         }
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+    private static bool IsNamespaceNotReady(RpcException exception) =>
+        exception.Code == RpcException.StatusCode.NotFound
+        && exception.Message.Contains("Namespace default is not found", StringComparison.OrdinalIgnoreCase);
 }

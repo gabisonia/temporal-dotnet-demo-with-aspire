@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using Temporalio.Client;
 using TemporalDemo.Payments.Api.Infrastructure;
 using TemporalDemo.Payments.Api.Temporal;
@@ -10,8 +11,14 @@ builder.Services.AddOpenApi();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+var appDbConnectionString = builder.Configuration.GetConnectionString("AppDb")
+                            ?? throw new InvalidOperationException("Connection string 'AppDb' is not configured.");
+
+builder.Services.AddDbContextFactory<PaymentsDbContext>(options =>
+    options.UseNpgsql(appDbConnectionString));
 builder.Services.AddSingleton<PaymentsStore>();
 builder.Services.AddSingleton<PaymentsActivities>();
+builder.Services.AddSingleton<PaymentsDatabaseInitializer>();
 builder.Services.AddSingleton<TemporalClient>(_ =>
 {
     var address = builder.Configuration["Temporal:Address"] ?? "localhost:7233";
@@ -27,6 +34,8 @@ builder.Services.AddHostedService<PaymentsCronStarterService>();
 
 var app = builder.Build();
 
+await app.Services.GetRequiredService<PaymentsDatabaseInitializer>().InitializeAsync();
+
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
@@ -36,11 +45,12 @@ if (app.Environment.IsDevelopment())
 
 app.MapDefaultEndpoints();
 
-app.MapGet("/payments", (PaymentsStore store) => Results.Ok(store.GetAll()));
+app.MapGet("/payments", async (PaymentsStore store, CancellationToken cancellationToken) =>
+    Results.Ok(await store.GetAllAsync(cancellationToken)));
 
-app.MapGet("/payments/{orderId}", (string orderId, PaymentsStore store) =>
+app.MapGet("/payments/{orderId}", async (string orderId, PaymentsStore store, CancellationToken cancellationToken) =>
 {
-    var payment = store.Get(orderId);
+    var payment = await store.GetAsync(orderId, cancellationToken);
     return payment is null ? Results.NotFound() : Results.Ok(payment);
 });
 

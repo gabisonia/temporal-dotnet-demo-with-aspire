@@ -6,23 +6,14 @@ namespace TemporalDemo.Shop.Api.Temporal;
 public sealed class ShopActivities(ShopStore store) : IShopActivities
 {
     [Activity]
-    public Task ReserveInventoryAsync(OrderWorkflowInput input)
-    {
-        store.ReserveInventory(input);
-        return Task.CompletedTask;
-    }
+    public Task ReserveInventoryAsync(OrderWorkflowInput input) =>
+        store.ReserveInventoryAsync(input);
 
     [Activity]
-    public Task MarkOrderCompletedAsync(string orderId)
-    {
-        store.MarkCompleted(orderId);
-        return Task.CompletedTask;
-    }
+    public Task MarkOrderCompletedAsync(string orderId) =>
+        store.MarkCompletedAsync(orderId);
 
     [Activity]
-    public Task MarkOrderFailedAsync(string orderId, string reason)
-    {
-        store.MarkFailed(orderId, reason);
-        return Task.CompletedTask;
-    }
+    public Task MarkOrderFailedAsync(string orderId, string reason) =>
+        store.MarkFailedAsync(orderId, reason);
 }

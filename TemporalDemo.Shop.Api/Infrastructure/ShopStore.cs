@@ -1,88 +1,132 @@
-using System.Collections.Concurrent;
+using Microsoft.EntityFrameworkCore;
 using TemporalDemo.Shop.Api.Temporal;
 
 namespace TemporalDemo.Shop.Api.Infrastructure;
 
-public sealed class ShopStore
+public sealed class ShopStore(IDbContextFactory<ShopDbContext> dbContextFactory)
 {
-    private readonly ConcurrentDictionary<Guid, ProductInventory> _products = new()
+    public async Task<IReadOnlyCollection<ShopProduct>> GetProductsAsync(CancellationToken cancellationToken = default)
     {
-        [Guid.Parse("11111111-1111-1111-1111-111111111111")] = new("Laptop", 1200m, 5),
-        [Guid.Parse("22222222-2222-2222-2222-222222222222")] = new("Headphones", 250m, 12),
-        [Guid.Parse("33333333-3333-3333-3333-333333333333")] = new("Mouse", 80m, 25),
-    };
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-    private readonly ConcurrentDictionary<string, ShopOrder> _orders = new(StringComparer.OrdinalIgnoreCase);
-
-    public IReadOnlyCollection<ShopProduct> GetProducts() =>
-        _products
-            .Select(x => new ShopProduct(x.Key, x.Value.Name, x.Value.Price))
+        return await dbContext.Products
+            .AsNoTracking()
             .OrderBy(x => x.Name)
-            .ToArray();
+            .Select(x => new ShopProduct(x.Id, x.Name, x.Price))
+            .ToArrayAsync(cancellationToken);
+    }
 
-    public bool TryGetProduct(Guid id, out ShopProduct? product)
+    public async Task<ShopProduct?> GetProductAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        if (!_products.TryGetValue(id, out var inventory))
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+        return await dbContext.Products
+            .AsNoTracking()
+            .Where(x => x.Id == id)
+            .Select(x => new ShopProduct(x.Id, x.Name, x.Price))
+            .SingleOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task<ShopOrder?> GetOrderAsync(string orderId, CancellationToken cancellationToken = default)
+    {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+        return await dbContext.Orders
+            .AsNoTracking()
+            .Where(x => x.OrderId == orderId)
+            .Select(x => new ShopOrder(x.OrderId, x.ProductId, x.Quantity, x.Amount, x.Status, x.FailureReason))
+            .SingleOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task CreatePendingOrderAsync(
+        OrderWorkflowInput input,
+        CancellationToken cancellationToken = default)
+    {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+        dbContext.Orders.Add(new ShopOrderEntity
         {
-            product = null;
-            return false;
-        }
+            OrderId = input.OrderId,
+            ProductId = input.ProductId,
+            Quantity = input.Quantity,
+            Amount = input.Amount,
+            Status = "pending",
+        });
 
-        product = new ShopProduct(id, inventory.Name, inventory.Price);
-        return true;
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    public ShopOrder? GetOrder(string orderId)
+    public async Task ReserveInventoryAsync(
+        OrderWorkflowInput input,
+        CancellationToken cancellationToken = default)
     {
-        _orders.TryGetValue(orderId, out var order);
-        return order;
-    }
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-    public void CreatePendingOrder(OrderWorkflowInput input)
-    {
-        var order = new ShopOrder(input.OrderId, input.ProductId, input.Quantity, input.Amount, "pending", null);
-        _orders[input.OrderId] = order;
-    }
-
-    public void ReserveInventory(OrderWorkflowInput input)
-    {
-        if (!_products.TryGetValue(input.ProductId, out var inStock))
+        var product = await dbContext.Products.SingleOrDefaultAsync(x => x.Id == input.ProductId, cancellationToken);
+        if (product is null)
         {
             throw new InvalidOperationException($"Product '{input.ProductId}' does not exist.");
         }
 
-        if (inStock.Stock < input.Quantity)
+        if (product.Stock < input.Quantity)
         {
             throw new InvalidOperationException($"Not enough inventory for '{input.ProductId}'.");
         }
 
-        _products[input.ProductId] = inStock with { Stock = inStock.Stock - input.Quantity };
+        product.Stock -= input.Quantity;
 
-        _orders.AddOrUpdate(
-            input.OrderId,
-            _ => new ShopOrder(input.OrderId, input.ProductId, input.Quantity, input.Amount, "inventory_reserved",
-                null),
-            (_, existing) => existing with { Status = "inventory_reserved", FailureReason = null });
+        var order = await dbContext.Orders.SingleOrDefaultAsync(x => x.OrderId == input.OrderId, cancellationToken);
+        if (order is null)
+        {
+            dbContext.Orders.Add(new ShopOrderEntity
+            {
+                OrderId = input.OrderId,
+                ProductId = input.ProductId,
+                Quantity = input.Quantity,
+                Amount = input.Amount,
+                Status = "inventory_reserved",
+            });
+        }
+        else
+        {
+            order.Status = "inventory_reserved";
+            order.FailureReason = null;
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    public void MarkCompleted(string orderId)
+    public async Task MarkCompletedAsync(string orderId, CancellationToken cancellationToken = default)
     {
-        if (!_orders.TryGetValue(orderId, out var existing))
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+        var order = await dbContext.Orders.SingleOrDefaultAsync(x => x.OrderId == orderId, cancellationToken);
+        if (order is null)
         {
             return;
         }
 
-        _orders[orderId] = existing with { Status = "completed", FailureReason = null };
+        order.Status = "completed";
+        order.FailureReason = null;
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    public void MarkFailed(string orderId, string reason)
+    public async Task MarkFailedAsync(
+        string orderId,
+        string reason,
+        CancellationToken cancellationToken = default)
     {
-        if (!_orders.TryGetValue(orderId, out var existing))
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+        var order = await dbContext.Orders.SingleOrDefaultAsync(x => x.OrderId == orderId, cancellationToken);
+        if (order is null)
         {
             return;
         }
 
-        _orders[orderId] = existing with { Status = "failed", FailureReason = reason };
+        order.Status = "failed";
+        order.FailureReason = reason;
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 }
 
@@ -95,5 +139,3 @@ public sealed record ShopOrder(
     string? FailureReason);
 
 public sealed record ShopProduct(Guid Id, string Name, decimal Price);
-
-internal sealed record ProductInventory(string Name, decimal Price, int Stock);

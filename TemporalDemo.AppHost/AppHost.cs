@@ -31,7 +31,7 @@ var appDatabase = builder
     .WithEnvironment("POSTGRES_DB", settings.AppDatabase.Database)
     .WithEndpoint(name: "postgres", port: settings.AppDatabase.Port, targetPort: 5432);
 
-builder.AddProject("shop-api", "../TemporalDemo.Shop.Api/TemporalDemo.Shop.Api.csproj")
+builder.AddProject<Projects.TemporalDemo_Shop_Api>("shop-api")
     .WaitFor(temporal)
     .WaitFor(temporalUi)
     .WaitFor(appDatabase)
@@ -39,7 +39,7 @@ builder.AddProject("shop-api", "../TemporalDemo.Shop.Api/TemporalDemo.Shop.Api.c
     .WithEnvironment("Temporal__Address", settings.Temporal.Client.Address)
     .WithEnvironment("Temporal__Namespace", settings.Temporal.Client.Namespace);
 
-builder.AddProject("payments-api", "../TemporalDemo.Payments.Api/TemporalDemo.Payments.Api.csproj")
+builder.AddProject<Projects.TemporalDemo_Payments_Api>("payments-api")
     .WaitFor(temporal)
     .WaitFor(temporalUi)
     .WaitFor(appDatabase)

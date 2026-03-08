@@ -15,8 +15,10 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\TemporalDemo.Payments.Api\TemporalDemo.Payments.Api.csproj"/>
-        <ProjectReference Include="..\TemporalDemo.Shop.Api\TemporalDemo.Shop.Api.csproj"/>
+        <ProjectReference Include="..\TemporalDemo.Payments.Api\TemporalDemo.Payments.Api.csproj"
+                          IsAspireProjectResource="true"/>
+        <ProjectReference Include="..\TemporalDemo.Shop.Api\TemporalDemo.Shop.Api.csproj"
+                          IsAspireProjectResource="true"/>
     </ItemGroup>
 
 </Project>

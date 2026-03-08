@@ -7,12 +7,12 @@ Sample distributed demo with:
 - `TemporalDemo.AppHost`: .NET Aspire orchestrator
 - `TemporalDemo.ServiceDefaults`: shared Aspire defaults
 
-This demo uses in-memory storage only.
+This demo uses PostgreSQL-backed persistence with EF Core.
 
 ## Requirements
 
 - .NET SDK `10.0.100+`
-- Docker (for Temporal container started by Aspire)
+- Docker
 
 ## Run
 
@@ -26,6 +26,104 @@ After startup:
 - Aspire dashboard URL is printed in terminal output.
 - Temporal UI is exposed at `http://localhost:8233`.
 - Open each API Swagger UI from the dashboard service links (or `/swagger` on each API URL).
+
+## Architecture
+
+The Aspire host starts four infrastructure containers/resources:
+
+- `temporal-postgres`: Postgres used only by Temporal
+- `temporal`: Temporal server
+- `temporal-ui`: Temporal UI
+- `app-db`: shared application Postgres instance for shop and payments
+
+The application database is shared by both services, but each service writes to its own schema:
+
+- `shop-api` uses schema `shop`
+- `payments-api` uses schema `payments`
+
+There is one physical Postgres database for business data:
+
+- Database: `temporaldemoapp`
+- Port: `5434`
+
+This means shop and payments share the same Postgres server and database, but their tables remain isolated by schema.
+
+## Database usage
+
+### Shop
+
+`shop-api` persists:
+
+- products
+- orders
+
+On startup, `ShopDatabaseInitializer`:
+
+- creates the `shop` schema objects if they do not exist
+- seeds three products if the products table is empty
+
+Seeded product IDs:
+
+- `11111111-1111-1111-1111-111111111111` = Laptop
+- `22222222-2222-2222-2222-222222222222` = Headphones
+- `33333333-3333-3333-3333-333333333333` = Mouse
+
+### Payments
+
+`payments-api` persists:
+
+- payment records keyed by `orderId`
+
+On startup, `PaymentsDatabaseInitializer` creates the `payments` schema objects if they do not exist.
+
+### EF Core note
+
+This project currently uses EF Core runtime schema creation via `Database.GenerateCreateScript()` and `ExecuteSqlRawAsync(...)`.
+It does not use EF migrations yet.
+
+## Configuration
+
+### AppHost configuration
+
+[TemporalDemo.AppHost/appsettings.json](/Users/gabisonia/Desktop/TemporalDemo/TemporalDemo.AppHost/appsettings.json) contains:
+
+- `ConnectionStrings:AppDb`
+- `AppDatabase:*`
+- `Temporal:Postgres:*`
+- `Temporal:Server:*`
+- `Temporal:Ui:*`
+- `Temporal:Client:*`
+
+[TemporalDemo.AppHost/AppHostSettings.cs](/Users/gabisonia/Desktop/TemporalDemo/TemporalDemo.AppHost/AppHostSettings.cs) binds and validates these settings so [TemporalDemo.AppHost/AppHost.cs](/Users/gabisonia/Desktop/TemporalDemo/TemporalDemo.AppHost/AppHost.cs) stays focused on resource wiring.
+
+### API configuration
+
+The two APIs read the business database connection from their own config files:
+
+- [TemporalDemo.Shop.Api/appsettings.json](/Users/gabisonia/Desktop/TemporalDemo/TemporalDemo.Shop.Api/appsettings.json)
+- [TemporalDemo.Payments.Api/appsettings.json](/Users/gabisonia/Desktop/TemporalDemo/TemporalDemo.Payments.Api/appsettings.json)
+
+Both expect:
+
+```json
+"ConnectionStrings": {
+  "AppDb": "Host=localhost;Port=5434;Database=temporaldemoapp;Username=postgres;Password=postgres"
+}
+```
+
+At runtime, AppHost also passes the same connection string to both services through environment variables.
+
+### Temporal configuration
+
+Both APIs also receive:
+
+- `Temporal:Address`
+- `Temporal:Namespace`
+
+These are currently provided by AppHost and default to:
+
+- address: `localhost:7233`
+- namespace: `default`
 
 ## Demo flow
 
@@ -119,4 +217,5 @@ Expected: payment `status` is `declined` and order `status` is `failed`.
 - Shop starts the workflow on task queue `shop-tq`.
 - Workflow calls payment activity on task queue `payments-tq`.
 - Payments service declines charges above `5000`.
+- Shop and payments share one business Postgres instance, but use different schemas.
 - No centralized contracts project; service-local contracts are used.

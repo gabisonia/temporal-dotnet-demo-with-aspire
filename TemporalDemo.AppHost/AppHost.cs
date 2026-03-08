@@ -16,18 +16,20 @@ var temporal = builder
     .WaitFor(temporalPostgres)
     .WithEndpoint(name: "grpc", port: 7233, targetPort: 7233);
 
-builder.AddContainer("temporal-ui", "temporalio/ui")
+var temporalUi = builder.AddContainer("temporal-ui", "temporalio/ui")
     .WithEnvironment("TEMPORAL_ADDRESS", "temporal:7233")
     .WaitFor(temporal)
     .WithHttpEndpoint(name: "http", port: 8233, targetPort: 8080);
 
 builder.AddProject("shop-api", "../TemporalDemo.Shop.Api/TemporalDemo.Shop.Api.csproj")
     .WaitFor(temporal)
+    .WaitFor(temporalUi)
     .WithEnvironment("Temporal__Address", "localhost:7233")
     .WithEnvironment("Temporal__Namespace", "default");
 
 builder.AddProject("payments-api", "../TemporalDemo.Payments.Api/TemporalDemo.Payments.Api.csproj")
     .WaitFor(temporal)
+    .WaitFor(temporalUi)
     .WithEnvironment("Temporal__Address", "localhost:7233")
     .WithEnvironment("Temporal__Namespace", "default");
 

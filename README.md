@@ -37,6 +37,12 @@ aspire publish -o aspire-output
 
 Generated files are written under `aspire-output/`, including `docker-compose.yaml` and environment files for the published app.
 
+Start the published stack with:
+
+```bash
+docker compose -f aspire-output/docker-compose.yaml up -d
+```
+
 ## Architecture
 
 The Aspire host starts four infrastructure containers/resources:

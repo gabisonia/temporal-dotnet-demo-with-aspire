@@ -1,3 +1,4 @@
+using Aspire.Hosting.Docker;
 using TemporalDemo.AppHost;
 
 var builder = DistributedApplication.CreateBuilder(args);

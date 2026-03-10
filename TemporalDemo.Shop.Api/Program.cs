@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using TemporalDemo.ServiceDefaults;
+using TemporalDemo.Shop.Api;
 using Temporalio.Client;
 using TemporalDemo.Shop.Api.Infrastructure;
 using TemporalDemo.Shop.Api.Temporal;
@@ -19,12 +20,16 @@ builder.Services.AddDbContextFactory<ShopDbContext>(options =>
 builder.Services.AddSingleton<ShopStore>();
 builder.Services.AddSingleton<ShopActivities>();
 builder.Services.AddSingleton<ShopDatabaseInitializer>();
+builder.Services.AddHttpClient<PaymentsApiClient>(client =>
+{
+    client.BaseAddress = new Uri("https+http://payments-api");
+});
 builder.Services.AddSingleton<TemporalClient>(_ =>
 {
     var address = builder.Configuration["Temporal:Address"] ?? "localhost:7233";
     var temporalNamespace = builder.Configuration["Temporal:Namespace"] ?? "default";
 
-    return TemporalClient.ConnectAsync(new(address)
+    return TemporalClient.ConnectAsync(new TemporalClientConnectOptions(address)
     {
         Namespace = temporalNamespace,
     }).GetAwaiter().GetResult();
@@ -53,6 +58,31 @@ app.MapGet("/orders/{orderId}", async (string orderId, ShopStore store, Cancella
     return order is null ? Results.NotFound() : Results.Ok(order);
 });
 
+app.MapGet("/demo/service-discovery/payments/{orderId}", async (
+    string orderId,
+    PaymentsApiClient paymentsApiClient,
+    CancellationToken cancellationToken) =>
+{
+    var payment = await paymentsApiClient.GetPaymentAsync(orderId, cancellationToken);
+    if (!payment.Found)
+    {
+        return Results.NotFound(new
+        {
+            orderId,
+            service = "payments-api",
+            baseAddress = "https+http://payments-api",
+            message = "Payment was not found through the service-discovered payments-api endpoint."
+        });
+    }
+
+    return Results.Ok(new
+    {
+        service = "payments-api",
+        baseAddress = "https+http://payments-api",
+        payment = payment.Payment
+    });
+});
+
 app.MapPost("/orders", async (
     CreateOrderRequest request,
     ShopStore store,
@@ -78,7 +108,7 @@ app.MapPost("/orders", async (
 
     await temporalClient.StartWorkflowAsync(
         (IOrderWorkflow wf) => wf.RunAsync(workflowInput),
-        new(id: $"order-{orderId}", taskQueue: TemporalTaskQueues.Shop));
+        new WorkflowOptions(id: $"order-{orderId}", taskQueue: TemporalTaskQueues.Shop));
 
     return Results.Accepted($"/orders/{orderId}", new
     {

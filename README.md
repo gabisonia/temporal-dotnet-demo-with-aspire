@@ -8,6 +8,7 @@ Sample distributed demo with:
 - `TemporalDemo.ServiceDefaults`: shared Aspire defaults
 
 This demo uses PostgreSQL-backed persistence with EF Core.
+It also includes a simple Aspire service discovery sample where `shop-api` calls `payments-api` over HTTP using the service name `payments-api`.
 
 ## Requirements
 
@@ -29,12 +30,13 @@ After startup:
 
 ## Architecture
 
-The Aspire host starts four infrastructure containers/resources:
+The Aspire host starts four infrastructure resources:
 
 - `temporal-postgres`: Postgres used only by Temporal
 - `temporal`: Temporal server
 - `temporal-ui`: Temporal UI
-- `app-db`: shared application Postgres instance for shop and payments
+- `app-db`: Aspire PostgreSQL server resource for shop and payments
+- `AppDb`: Aspire PostgreSQL database resource referenced by both APIs
 
 The application database is shared by both services, but each service writes to its own schema:
 
@@ -111,7 +113,7 @@ Both expect:
 }
 ```
 
-At runtime, AppHost also passes the same connection string to both services through environment variables.
+At runtime under AppHost, both services receive `ConnectionStrings__AppDb` through Aspire's `.WithReference(AppDb)` resource injection instead of a manually composed connection string.
 
 ### Temporal configuration
 
@@ -120,10 +122,7 @@ Both APIs also receive:
 - `Temporal:Address`
 - `Temporal:Namespace`
 
-These are currently provided by AppHost and default to:
-
-- address: `localhost:7233`
-- namespace: `default`
+AppHost now binds the Temporal address from the `temporal` gRPC endpoint allocation instead of hardcoding `localhost:7233`. The namespace still defaults to `default`.
 
 ## Demo flow
 
@@ -150,6 +149,26 @@ GET /orders/{orderId}
 ```http
 GET /payments/{orderId}
 ```
+
+4. Check the same payment through Aspire service discovery:
+
+```http
+GET /demo/service-discovery/payments/{orderId}
+```
+
+This endpoint lives in `shop-api` and calls `payments-api` through a typed `HttpClient` configured with:
+
+```csharp
+new Uri("https+http://payments-api")
+```
+
+The AppHost enables this by wiring:
+
+```csharp
+shopApi.WithReference(paymentsApi)
+```
+
+That gives `shop-api` the service discovery endpoint metadata for `payments-api`, and `AddServiceDefaults()` enables resolution on `HttpClient`.
 
 ## What to call to test
 
@@ -195,7 +214,19 @@ curl -sS "$PAYMENTS_URL/payments/<ORDER_ID>"
 
 Expected: payment `status` is `approved`.
 
-7. Test failure path (payment decline, amount > 5000):
+7. Check the same payment through `shop-api` using Aspire service discovery:
+
+```bash
+curl -sS "$SHOP_URL/demo/service-discovery/payments/<ORDER_ID>"
+```
+
+Expected: response includes:
+
+- `service: "payments-api"`
+- `baseAddress: "https+http://payments-api"`
+- `payment.status: "approved"`
+
+8. Test failure path (payment decline, amount > 5000):
 
 ```bash
 curl -sS -X POST "$SHOP_URL/orders" \

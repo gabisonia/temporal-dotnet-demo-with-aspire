@@ -4,8 +4,7 @@ namespace TemporalDemo.AppHost;
 
 internal sealed record AppHostSettings(
     TemporalSettings Temporal,
-    AppDatabaseSettings AppDatabase,
-    string AppDbConnectionString)
+    AppDatabaseSettings AppDatabase)
 {
     public static AppHostSettings Load(IConfiguration configuration) =>
         new(
@@ -29,8 +28,7 @@ internal sealed record AppHostSettings(
                 User: configuration.GetRequiredValue("AppDatabase:User"),
                 Password: configuration.GetRequiredValue("AppDatabase:Password"),
                 Database: configuration.GetRequiredValue("AppDatabase:Database"),
-                Port: configuration.GetRequiredInt("AppDatabase:Port")),
-            AppDbConnectionString: configuration.GetRequiredValue("ConnectionStrings:AppDb"));
+                Port: configuration.GetRequiredInt("AppDatabase:Port")));
 }
 
 internal sealed record TemporalSettings(

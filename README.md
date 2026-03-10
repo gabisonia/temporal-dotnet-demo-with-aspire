@@ -27,6 +27,16 @@ After startup:
 - Temporal UI is exposed at `http://localhost:8233`.
 - Open each API Swagger UI from the dashboard service links (or `/swagger` on each API URL).
 
+## Generate Docker Compose
+
+This AppHost is configured to publish Docker Compose artifacts.
+
+```bash
+aspire publish -o aspire-output
+```
+
+Generated files are written under `aspire-output/`, including `docker-compose.yaml` and environment files for the published app.
+
 ## Architecture
 
 The Aspire host starts four infrastructure containers/resources:

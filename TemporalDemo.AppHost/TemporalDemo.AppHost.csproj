@@ -1,4 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
+    <Sdk Name="Aspire.AppHost.Sdk" Version="13.1.2" />
 
     <PropertyGroup>
         <OutputType>Exe</OutputType>
@@ -10,6 +11,7 @@
 
     <ItemGroup>
         <PackageReference Include="Aspire.Hosting.AppHost" Version="13.1.2"/>
+        <PackageReference Include="Aspire.Hosting.Docker" Version="13.1.2-preview.1.26125.13"/>
         <PackageReference Include="Aspire.Hosting.Orchestration.osx-arm64" Version="13.1.2" PrivateAssets="all"/>
         <PackageReference Include="Aspire.Dashboard.Sdk.osx-arm64" Version="13.1.2" PrivateAssets="all"/>
     </ItemGroup>

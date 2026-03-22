@@ -27,7 +27,7 @@ public sealed record PaymentView(string OrderId, decimal Amount, string Status, 
 
 public sealed record PaymentsApiResult(PaymentView? Payment)
 {
-    public static PaymentsApiResult NotFound { get; }
+    public static PaymentsApiResult NotFound { get; } = new((PaymentView?)null);
 
     public bool Found => Payment is not null;
 }

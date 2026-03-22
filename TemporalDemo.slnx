@@ -1,5 +1,6 @@
 <Solution>
     <Project Path="TemporalDemo.AppHost/TemporalDemo.AppHost.csproj"/>
+    <Project Path="TemporalDemo.AppHost.Tests/TemporalDemo.AppHost.Tests.csproj"/>
     <Project Path="TemporalDemo.Payments.Api/TemporalDemo.Payments.Api.csproj"/>
     <Project Path="TemporalDemo.ServiceDefaults/TemporalDemo.ServiceDefaults.csproj"/>
     <Project Path="TemporalDemo.Shop.Api/TemporalDemo.Shop.Api.csproj"/>

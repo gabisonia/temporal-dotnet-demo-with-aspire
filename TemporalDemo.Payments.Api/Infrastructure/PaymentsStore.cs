@@ -1,8 +1,11 @@
 using Microsoft.EntityFrameworkCore;
+using TemporalDemo.Payments.Api.Observability;
 
 namespace TemporalDemo.Payments.Api.Infrastructure;
 
-public sealed class PaymentsStore(IDbContextFactory<PaymentsDbContext> dbContextFactory)
+public sealed class PaymentsStore(
+    IDbContextFactory<PaymentsDbContext> dbContextFactory,
+    PaymentsMetrics metrics)
 {
     public async Task<IReadOnlyCollection<PaymentRecord>> GetAllAsync(CancellationToken cancellationToken = default)
     {
@@ -32,6 +35,7 @@ public sealed class PaymentsStore(IDbContextFactory<PaymentsDbContext> dbContext
         CancellationToken cancellationToken = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        metrics.RecordChargeAttempt(amount);
 
         var payment = await dbContext.Payments.SingleOrDefaultAsync(x => x.OrderId == orderId, cancellationToken);
         payment ??= new PaymentEntity { OrderId = orderId };
@@ -48,6 +52,7 @@ public sealed class PaymentsStore(IDbContextFactory<PaymentsDbContext> dbContext
             }
 
             await dbContext.SaveChangesAsync(cancellationToken);
+            metrics.RecordChargeResult("declined", amount);
             throw new InvalidOperationException(
                 $"Payment declined for order '{orderId}' because amount exceeds limit.");
         }
@@ -59,6 +64,7 @@ public sealed class PaymentsStore(IDbContextFactory<PaymentsDbContext> dbContext
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
+        metrics.RecordChargeResult("approved", amount);
         return new PaymentRecord(payment.OrderId, payment.Amount, payment.Status, payment.UpdatedAtUtc);
     }
 }

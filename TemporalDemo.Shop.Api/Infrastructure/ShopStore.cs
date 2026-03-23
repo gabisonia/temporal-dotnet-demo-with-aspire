@@ -1,9 +1,12 @@
 using Microsoft.EntityFrameworkCore;
+using TemporalDemo.Shop.Api.Observability;
 using TemporalDemo.Shop.Api.Temporal;
 
 namespace TemporalDemo.Shop.Api.Infrastructure;
 
-public sealed class ShopStore(IDbContextFactory<ShopDbContext> dbContextFactory)
+public sealed class ShopStore(
+    IDbContextFactory<ShopDbContext> dbContextFactory,
+    ShopMetrics metrics)
 {
     public async Task<IReadOnlyCollection<ShopProduct>> GetProductsAsync(CancellationToken cancellationToken = default)
     {
@@ -54,6 +57,8 @@ public sealed class ShopStore(IDbContextFactory<ShopDbContext> dbContextFactory)
         });
 
         await dbContext.SaveChangesAsync(cancellationToken);
+        metrics.RecordOrderCreated(input.Amount);
+        metrics.RecordOrderStatus("pending");
     }
 
     public async Task ReserveInventoryAsync(
@@ -94,6 +99,7 @@ public sealed class ShopStore(IDbContextFactory<ShopDbContext> dbContextFactory)
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
+        metrics.RecordOrderStatus("inventory_reserved");
     }
 
     public async Task MarkCompletedAsync(string orderId, CancellationToken cancellationToken = default)
@@ -109,6 +115,7 @@ public sealed class ShopStore(IDbContextFactory<ShopDbContext> dbContextFactory)
         order.Status = "completed";
         order.FailureReason = null;
         await dbContext.SaveChangesAsync(cancellationToken);
+        metrics.RecordOrderStatus("completed");
     }
 
     public async Task MarkFailedAsync(
@@ -127,6 +134,7 @@ public sealed class ShopStore(IDbContextFactory<ShopDbContext> dbContextFactory)
         order.Status = "failed";
         order.FailureReason = reason;
         await dbContext.SaveChangesAsync(cancellationToken);
+        metrics.RecordOrderStatus("failed");
     }
 }
 

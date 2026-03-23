@@ -1,8 +1,10 @@
 using Microsoft.EntityFrameworkCore;
+using OpenTelemetry.Metrics;
 using TemporalDemo.ServiceDefaults;
 using TemporalDemo.Shop.Api;
 using Temporalio.Client;
 using TemporalDemo.Shop.Api.Infrastructure;
+using TemporalDemo.Shop.Api.Observability;
 using TemporalDemo.Shop.Api.Temporal;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -11,12 +13,15 @@ builder.AddServiceDefaults();
 builder.Services.AddOpenApi();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddOpenTelemetry()
+    .WithMetrics(metrics => metrics.AddMeter(ShopMetrics.MeterName));
 
 var appDbConnectionString = builder.Configuration.GetConnectionString("AppDb")
                             ?? throw new InvalidOperationException("Connection string 'AppDb' is not configured.");
 
 builder.Services.AddDbContextFactory<ShopDbContext>(options =>
     options.UseNpgsql(appDbConnectionString));
+builder.Services.AddSingleton<ShopMetrics>();
 builder.Services.AddSingleton<ShopStore>();
 builder.Services.AddSingleton<ShopActivities>();
 builder.Services.AddSingleton<ShopDatabaseInitializer>();

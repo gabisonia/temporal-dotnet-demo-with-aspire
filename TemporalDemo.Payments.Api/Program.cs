@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
+using OpenTelemetry.Metrics;
 using Temporalio.Client;
 using TemporalDemo.Payments.Api.Infrastructure;
+using TemporalDemo.Payments.Api.Observability;
 using TemporalDemo.Payments.Api.Temporal;
 using TemporalDemo.ServiceDefaults;
 
@@ -10,12 +12,15 @@ builder.AddServiceDefaults();
 builder.Services.AddOpenApi();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddOpenTelemetry()
+    .WithMetrics(metrics => metrics.AddMeter(PaymentsMetrics.MeterName));
 
 var appDbConnectionString = builder.Configuration.GetConnectionString("AppDb")
                             ?? throw new InvalidOperationException("Connection string 'AppDb' is not configured.");
 
 builder.Services.AddDbContextFactory<PaymentsDbContext>(options =>
     options.UseNpgsql(appDbConnectionString));
+builder.Services.AddSingleton<PaymentsMetrics>();
 builder.Services.AddSingleton<PaymentsStore>();
 builder.Services.AddSingleton<PaymentsActivities>();
 builder.Services.AddSingleton<PaymentsDatabaseInitializer>();

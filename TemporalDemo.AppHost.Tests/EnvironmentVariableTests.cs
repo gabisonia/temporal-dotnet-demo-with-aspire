@@ -18,7 +18,7 @@ public sealed class EnvironmentVariableTests
         var environmentVariables = executionConfiguration.EnvironmentVariables.ToDictionary();
 
         Assert.Contains(environmentVariables, entry =>
-            entry.Key == "Temporal__Namespace" && entry.Value == "default");
+            entry is { Key: "Temporal__Namespace", Value: "default" });
 
         Assert.Contains(environmentVariables, entry =>
             entry.Key == "Temporal__Address"

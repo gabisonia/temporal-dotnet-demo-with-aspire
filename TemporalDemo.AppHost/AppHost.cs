@@ -1,59 +1,48 @@
-using Aspire.Hosting.ApplicationModel;
 using TemporalDemo.AppHost;
 
 var builder = DistributedApplication.CreateBuilder(args);
 var settings = AppHostSettings.Load(builder.Configuration);
 
-var temporalPostgres = builder
-    .AddContainer("temporal-postgres", "postgres", "16")
-    .WithEnvironment("POSTGRES_USER", settings.Temporal.Postgres.User)
-    .WithEnvironment("POSTGRES_PASSWORD", settings.Temporal.Postgres.Password)
-    .WithEnvironment("POSTGRES_DB", settings.Temporal.Postgres.Database);
+// Infrastructure resources
+var temporalPostgres = builder.AddPostgres("temporal-postgres");
+var temporalDatabase = temporalPostgres.AddDatabase("temporal-db", "temporal");
 
-var temporal = builder
+var temporalServer = builder
     .AddContainer("temporal", "temporalio/auto-setup", "1.26.2")
     .WithEnvironment("DB", settings.Temporal.Server.Db)
-    .WithEnvironment("DB_PORT", settings.Temporal.Server.DbPort)
-    .WithEnvironment("POSTGRES_USER", settings.Temporal.Postgres.User)
-    .WithEnvironment("POSTGRES_PWD", settings.Temporal.Postgres.Password)
-    .WithEnvironment("POSTGRES_SEEDS", settings.Temporal.Server.PostgresSeeds)
-    .WaitFor(temporalPostgres)
-    .WithEndpoint(name: "grpc", port: settings.Temporal.Server.GrpcPort, targetPort: 7233);
+    .WithEnvironment("DB_PORT", temporalPostgres.Resource.Port)
+    .WithEnvironment("POSTGRES_USER", temporalPostgres.Resource.UserNameReference)
+    .WithEnvironment("POSTGRES_PWD", temporalPostgres.Resource.PasswordParameter)
+    .WithEnvironment("POSTGRES_SEEDS", temporalPostgres.Resource.Host)
+    .WaitFor(temporalDatabase)
+    .WithEndpoint(name: "grpc", targetPort: 7233);
 
-var temporalGrpcEndpoint = temporal.GetEndpoint("grpc");
+var temporalGrpcEndpoint = temporalServer.GetEndpoint("grpc");
 
-var temporalUi = builder.AddContainer("temporal-ui", "temporalio/ui")
+builder.AddContainer("temporal-ui", "temporalio/ui")
     .WithEnvironment("TEMPORAL_ADDRESS", temporalGrpcEndpoint.Property(EndpointProperty.HostAndPort))
-    .WaitFor(temporal)
-    .WithHttpEndpoint(name: "http", port: settings.Temporal.Ui.Port, targetPort: 8080);
+    .WaitFor(temporalServer)
+    .WithHttpEndpoint(name: "http", targetPort: 8080);
 
-var appDatabaseUser = builder.AddParameter(
-    "app-db-user",
-    settings.AppDatabase.User,
-    publishValueAsDefault: true,
-    secret: false);
-var appDatabasePassword = builder.AddParameter(
-    "app-db-password",
-    settings.AppDatabase.Password,
-    publishValueAsDefault: false,
-    secret: true);
-var appDatabaseServer = builder.AddPostgres("app-db", appDatabaseUser, appDatabasePassword, settings.AppDatabase.Port);
+var appDatabaseServer = builder.AddPostgres("app-db");
 var appDatabase = appDatabaseServer.AddDatabase("AppDb", settings.AppDatabase.Database);
 
-var shopApi = builder.AddProject<Projects.TemporalDemo_Shop_Api>("shop-api")
-    .WaitFor(temporal)
-    .WaitFor(appDatabase)
-    .WithReference(appDatabase)
-    .WithEnvironment("Temporal__Address", temporalGrpcEndpoint.Property(EndpointProperty.HostAndPort))
-    .WithEnvironment("Temporal__Namespace", settings.Temporal.Client.Namespace);
-
+// Application resources
 var paymentsApi = builder.AddProject<Projects.TemporalDemo_Payments_Api>("payments-api")
-    .WaitFor(temporal)
+    .WaitFor(temporalServer)
     .WaitFor(appDatabase)
     .WithReference(appDatabase)
     .WithEnvironment("Temporal__Address", temporalGrpcEndpoint.Property(EndpointProperty.HostAndPort))
     .WithEnvironment("Temporal__Namespace", settings.Temporal.Client.Namespace);
 
+var shopApi = builder.AddProject<Projects.TemporalDemo_Shop_Api>("shop-api")
+    .WaitFor(temporalServer)
+    .WaitFor(appDatabase)
+    .WithReference(appDatabase)
+    .WithEnvironment("Temporal__Address", temporalGrpcEndpoint.Property(EndpointProperty.HostAndPort))
+    .WithEnvironment("Temporal__Namespace", settings.Temporal.Client.Namespace);
+
+// From shop service we call payments api
 shopApi
     .WithReference(paymentsApi)
     .WaitFor(paymentsApi);

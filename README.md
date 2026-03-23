@@ -25,7 +25,7 @@ dotnet run --project TemporalDemo.AppHost
 After startup:
 
 - Aspire dashboard URL is printed in terminal output.
-- Temporal UI is exposed at `http://localhost:8233`.
+- Temporal UI is exposed through the dashboard service links on a dynamically assigned local port.
 - Open each API Swagger UI from the dashboard service links (or `/swagger` on each API URL).
 
 ## Architecture
@@ -46,7 +46,6 @@ The application database is shared by both services, but each service writes to 
 There is one physical Postgres database for business data:
 
 - Database: `temporaldemoapp`
-- Port: `5434`
 
 This means shop and payments share the same Postgres server and database, but their tables remain isolated by schema.
 
@@ -89,12 +88,9 @@ It does not use EF migrations yet.
 
 [TemporalDemo.AppHost/appsettings.json](/Users/gabisonia/Desktop/TemporalDemo/TemporalDemo.AppHost/appsettings.json) contains:
 
-- `ConnectionStrings:AppDb`
-- `AppDatabase:*`
-- `Temporal:Postgres:*`
-- `Temporal:Server:*`
-- `Temporal:Ui:*`
-- `Temporal:Client:*`
+- `AppDatabase:Database`
+- `Temporal:Server:Db`
+- `Temporal:Client:Namespace`
 
 [TemporalDemo.AppHost/AppHostSettings.cs](/Users/gabisonia/Desktop/TemporalDemo/TemporalDemo.AppHost/AppHostSettings.cs) binds and validates these settings so [TemporalDemo.AppHost/AppHost.cs](/Users/gabisonia/Desktop/TemporalDemo/TemporalDemo.AppHost/AppHost.cs) stays focused on resource wiring.
 
@@ -114,6 +110,7 @@ Both expect:
 ```
 
 At runtime under AppHost, both services receive `ConnectionStrings__AppDb` through Aspire's `.WithReference(AppDb)` resource injection instead of a manually composed connection string.
+AppHost lets Aspire allocate the local host port dynamically.
 
 ### Temporal configuration
 
@@ -122,7 +119,7 @@ Both APIs also receive:
 - `Temporal:Address`
 - `Temporal:Namespace`
 
-AppHost now binds the Temporal address from the `temporal` gRPC endpoint allocation instead of hardcoding `localhost:7233`. The namespace still defaults to `default`.
+AppHost now binds the Temporal address from the `temporal` gRPC endpoint allocation instead of hardcoding `localhost:7233`. Aspire allocates the local host port dynamically, and the namespace still defaults to `default`.
 
 ## Demo flow
 

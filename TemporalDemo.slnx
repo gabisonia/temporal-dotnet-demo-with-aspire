@@ -1,13 +1,13 @@
 <Solution>
-  <Folder Name="/Aspire/">
-    <Project Path="TemporalDemo.AppHost/TemporalDemo.AppHost.csproj" />
-    <Project Path="TemporalDemo.ServiceDefaults/TemporalDemo.ServiceDefaults.csproj" />
-  </Folder>
-  <Folder Name="/Services/">
-    <Project Path="TemporalDemo.Payments.Api/TemporalDemo.Payments.Api.csproj" />
-    <Project Path="TemporalDemo.Shop.Api/TemporalDemo.Shop.Api.csproj" />
-  </Folder>
-  <Folder Name="/Tests/">
-    <Project Path="TemporalDemo.AppHost.Tests/TemporalDemo.AppHost.Tests.csproj" />
-  </Folder>
+    <Folder Name="/Aspire/">
+        <Project Path="TemporalDemo.AppHost/TemporalDemo.AppHost.csproj"/>
+        <Project Path="TemporalDemo.ServiceDefaults/TemporalDemo.ServiceDefaults.csproj"/>
+    </Folder>
+    <Folder Name="/Services/">
+        <Project Path="TemporalDemo.Payments.Api/TemporalDemo.Payments.Api.csproj"/>
+        <Project Path="TemporalDemo.Shop.Api/TemporalDemo.Shop.Api.csproj"/>
+    </Folder>
+    <Folder Name="/Tests/">
+        <Project Path="TemporalDemo.AppHost.Tests/TemporalDemo.AppHost.Tests.csproj"/>
+    </Folder>
 </Solution>

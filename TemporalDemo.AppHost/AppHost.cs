@@ -57,4 +57,10 @@ shopApi
     .WithReference(paymentsApi)
     .WaitFor(paymentsApi);
 
+builder.AddDevTunnel("shop-public-api")
+    .WithReference(shopApi.GetEndpoint("http"), allowAnonymous: true);
+
+builder.AddDevTunnel("payments-public-api")
+    .WithReference(paymentsApi.GetEndpoint("http"), allowAnonymous: true);
+
 builder.Build().Run();

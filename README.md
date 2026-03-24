@@ -14,6 +14,7 @@ It also includes a simple Aspire service discovery sample where `shop-api` calls
 
 - .NET SDK `10.0.100+`
 - Docker
+- `devtunnel` CLI if you want the APIs exposed publicly through Aspire Dev Tunnels
 
 ## Run
 
@@ -27,6 +28,23 @@ After startup:
 - Aspire dashboard URL is printed in terminal output.
 - Temporal UI is exposed through the dashboard service links on a dynamically assigned local port.
 - Open each API Swagger UI from the dashboard service links (or `/swagger` on each API URL).
+
+## Public API tunnels
+
+The AppHost now creates two dev tunnels with anonymous access:
+
+- `shop-public-api`
+- `payments-public-api`
+
+Before starting the AppHost for public sharing:
+
+```bash
+devtunnel user login
+```
+
+When `TemporalDemo.AppHost` starts, Aspire creates the tunnels and shows the public URLs in the dashboard under the `shop-public-api` and `payments-public-api` resources.
+
+This is intended for temporary development/testing access only, not production use.
 
 ## Architecture
 
